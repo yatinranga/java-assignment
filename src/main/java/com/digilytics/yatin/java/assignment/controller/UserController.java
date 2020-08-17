@@ -4,6 +4,8 @@ import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -25,6 +27,8 @@ public class UserController {
 	@Autowired
 	private UserService userService;
 
+	private static Logger logger = LoggerFactory.getLogger(UserController.class);
+
 	@PostMapping(value = "/register")
 	public DigilyticsUserResponse registerFromFile(@RequestParam("file") MultipartFile file) {
 		return userService.registerFromFile(file);
@@ -38,7 +42,7 @@ public class UserController {
 		try {
 			contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
 		} catch (IOException ex) {
-			// logger.info("Could not determine file type.");
+			logger.info("Could not determine file type.");
 		}
 
 		if (contentType == null) {

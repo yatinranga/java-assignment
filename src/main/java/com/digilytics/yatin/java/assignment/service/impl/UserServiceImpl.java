@@ -66,13 +66,18 @@ public class UserServiceImpl implements UserService {
 	 * @param fileName
 	 * @return {@link FileOutputStream}
 	 */
-	private static FileOutputStream createErrorFile(String path, String fileName) {
+	private static FileOutputStream createErrorFile(String path, String fileName, String[] row) {
 
 		FileOutputStream errorFile = null;
 		try {
 			errorFile = new FileOutputStream(path + fileName, true);
-			// true/false in 2nd arg indicate that will continue inside file otherwise it'll
-			// create a new file and write it and previous data is lost
+			String s = "";
+
+			for (int i = 0; i < row.length; i++) {
+				s = s + row[i] + ", ";
+			}
+
+			errorFile.write(s.getBytes());
 		} catch (IOException e) {
 			System.err.println(e.getMessage() + "Error File Not Created");
 		}
@@ -121,23 +126,32 @@ public class UserServiceImpl implements UserService {
 	private UserRequest validateUserRequest(String[] row, Map<String, Long> idNameMap) throws IOException {
 
 		UserRequest userRequest = new UserRequest();
+		Boolean flag = false;
+		FileOutputStream errorFile = null;
+		String tempErrors = null;
+
+		if (row.length < 3 || row[0].equals("") || row[1].equals("") || row[2].isEmpty()) {
+			errorFile = createErrorFile(errorFilePath, "errorFile.csv", row);
+			tempErrors = "Data is missing";
+			errors = tempErrors;
+			errorFile.write(tempErrors.getBytes());
+			errorFile.write(10);
+			errorFile.close();
+			return null;
+		}
 
 		userRequest.setEmail(row[0]);
 		userRequest.setName(row[1]);
 		List<String> requestRoles = Arrays.asList(row[2].split("#"));
 		Set<Long> roleIds = new HashSet<Long>();
-		Boolean flag = false;
-		FileOutputStream errorFile = null;
-		String tempErrors = null;
 
-		if (userJpaDao.findIdByEmailAndActive(userRequest.getEmail(), true) != null) {
+		Long userId = userJpaDao.findIdByEmailAndActive(userRequest.getEmail(), true);
+		if (userId != null) {
 			// throw new ValidationException(String.format("This user's email (%s) already
 			// exists", request.getEmail()));
 
 			if (flag == false) {
-				errorFile = createErrorFile(errorFilePath, "errorFile.csv");
-				String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString() + ",";
-				errorFile.write(s.getBytes());
+				errorFile = createErrorFile(errorFilePath, "errorFile.csv", row);
 				flag = true;
 			}
 			tempErrors = "Email already exist";
@@ -148,11 +162,8 @@ public class UserServiceImpl implements UserService {
 			if (idNameMap.containsKey(requestRole)) {
 				roleIds.add(idNameMap.get(requestRole));
 			} else {
-				errorFile = createErrorFile(errorFilePath, "errorFile.csv");
 				if (flag == false) {
-					String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString()
-							+ ",";
-					errorFile.write(s.getBytes());
+					errorFile = createErrorFile(errorFilePath, "errorFile.csv", row);
 					tempErrors = String.format("Invaid Role %s", requestRole);
 					flag = true;
 				} else {
