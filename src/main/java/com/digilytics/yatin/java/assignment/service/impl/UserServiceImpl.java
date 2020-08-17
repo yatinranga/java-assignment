@@ -13,8 +13,11 @@ import java.util.Set;
 import javax.transaction.Transactional;
 
 import org.apache.commons.io.FilenameUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import com.digilytics.yatin.java.assignment.dao.jpa.UserJpaDao;
 import com.digilytics.yatin.java.assignment.dao.jpa.UserRoleJpaDao;
 import com.digilytics.yatin.java.assignment.entity.user.User;
 import com.digilytics.yatin.java.assignment.ex.ValidationException;
+import com.digilytics.yatin.java.assignment.service.FileStorageService;
 import com.digilytics.yatin.java.assignment.service.UserService;
 import com.digilytics.yatin.java.assignment.view.role.RoleResponse;
 import com.digilytics.yatin.java.assignment.view.user.DigilyticsUserResponse;
@@ -51,15 +55,22 @@ public class UserServiceImpl implements UserService {
 
 	private static PasswordEncoder userPasswordEncoder = new BCryptPasswordEncoder();
 
-	static int rowParsed = 0;
-	static int rowFailed = 0;
-	static String errors = null;
+	private static Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
-	public static FileOutputStream createErrorFile(String path) {
+	private static String errors = null;
+
+	/**
+	 * this method is used to create file and if file already exist return the file
+	 * 
+	 * @param path
+	 * @param fileName
+	 * @return {@link FileOutputStream}
+	 */
+	private static FileOutputStream createErrorFile(String path, String fileName) {
 
 		FileOutputStream errorFile = null;
 		try {
-			errorFile = new FileOutputStream(path, true);
+			errorFile = new FileOutputStream(path + fileName, true);
 			// true/false in 2nd arg indicate that will continue inside file otherwise it'll
 			// create a new file and write it and previous data is lost
 		} catch (IOException e) {
@@ -87,31 +98,8 @@ public class UserServiceImpl implements UserService {
 		return response;
 	}
 
-	/**
-	 * this method used to validate user request like username already exist or not
-	 *
-	 * @param request
-	 */
-//	private void validate(UserRequest request) {
-//
-//		FileOutputStream errorFile = createErrorFile(errorFilePath);
-//		if (userJpaDao.existsByUsername(request.getEmail().toString())) {
-//			// throw new ValidationException(String.format("This user (%s) already exist",
-//			// request.getEmail()));
-//			rowFailed++;
-//			return;
-//		} else if (userJpaDao.findIdByEmailAndActive(request.getEmail(), true) != null) {
-//			// throw new ValidationException(String.format("This user's email (%s) already
-//			// exists", request.getEmail()));
-//			rowFailed++;
-//			return;
-//		}
-//
-//	}
-
 	@Override
 	public UserResponse save(UserRequest request) {
-		// validate(request);
 		User user = request.toEntity();
 		user.setPassword(userPasswordEncoder.encode("12345"));
 		user = userJpaDao.save(user);
@@ -122,14 +110,17 @@ public class UserServiceImpl implements UserService {
 		return fetch(user, request.getRoleIds());
 	}
 
+	/**
+	 * this method is used to validate the user request
+	 * 
+	 * @param row
+	 * @param idNameMap
+	 * @return
+	 * @throws IOException
+	 */
 	private UserRequest validateUserRequest(String[] row, Map<String, Long> idNameMap) throws IOException {
 
 		UserRequest userRequest = new UserRequest();
-
-//		if (row == null) {
-//			// throw new ValidationException(String.format("Row is empty"));
-//			rowFailed++;
-//		}
 
 		userRequest.setEmail(row[0]);
 		userRequest.setName(row[1]);
@@ -142,15 +133,14 @@ public class UserServiceImpl implements UserService {
 		if (userJpaDao.findIdByEmailAndActive(userRequest.getEmail(), true) != null) {
 			// throw new ValidationException(String.format("This user's email (%s) already
 			// exists", request.getEmail()));
-			rowFailed++;
 
 			if (flag == false) {
-				errorFile = createErrorFile(errorFilePath);
-				String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString();
+				errorFile = createErrorFile(errorFilePath, "errorFile.csv");
+				String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString() + ",";
 				errorFile.write(s.getBytes());
-				tempErrors = "Invalid Email ";
 				flag = true;
 			}
+			tempErrors = "Email already exist";
 
 		}
 
@@ -158,22 +148,25 @@ public class UserServiceImpl implements UserService {
 			if (idNameMap.containsKey(requestRole)) {
 				roleIds.add(idNameMap.get(requestRole));
 			} else {
-				rowFailed++;
-				errorFile = createErrorFile(errorFilePath);
+				errorFile = createErrorFile(errorFilePath, "errorFile.csv");
 				if (flag == false) {
-					String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString();
+					String s = userRequest.getName() + "," + userRequest.getEmail() + "," + requestRoles.toString()
+							+ ",";
 					errorFile.write(s.getBytes());
 					tempErrors = String.format("Invaid Role %s", requestRole);
 					flag = true;
 				} else {
 					tempErrors = tempErrors + "#" + String.format("Invaid Role %s ", requestRole);
 				}
-				errorFile.write(tempErrors.getBytes());
+
 			}
 		}
 
 		if (tempErrors != null) {
 			errors = tempErrors;
+			errorFile.write(tempErrors.getBytes());
+			errorFile.write(10);
+			errorFile.close();
 			return null;
 		}
 		userRequest.setRoleIds(roleIds);
@@ -181,6 +174,8 @@ public class UserServiceImpl implements UserService {
 	}
 
 	private DigilyticsUserResponse readDataFromCsvFile(MultipartFile file) {
+		int rowParsed = 0, rowFailed = 0;
+
 		try {
 			InputStreamReader reader = new InputStreamReader(file.getInputStream());
 			CSVReader csvReader = new CSVReaderBuilder(reader).withSkipLines(1).build();
@@ -197,30 +192,31 @@ public class UserServiceImpl implements UserService {
 				UserRequest request = validateUserRequest(row, idNameMap);
 				if (request != null) {
 					UserResponse response = save(request);
-					if (response.getId() != null) {
+					if (response != null) {
+						logger.info("user successfully saved", response.getId());
 						rowParsed++;
-					} else {
-						rowFailed++;
 					}
 
+				} else {
+					rowFailed++;
 				}
 
 			}
 
 		} catch (Exception e) {
-
+			System.err.println(e.getMessage());
 		}
 		if (errors == null)
 			return new DigilyticsUserResponse(rowParsed, rowFailed);
-		else
-			return new DigilyticsUserResponse(rowParsed, rowFailed, "/download/errorFilePath");
+		else {
+			return new DigilyticsUserResponse(rowParsed, rowFailed, "/download/errorFile.csv");
+		}
 
 	}
 
 	@Override
 	public DigilyticsUserResponse registerFromFile(MultipartFile file) {
-		rowParsed = 0;
-		rowFailed = 0;
+
 		errors = null;
 
 		if (file == null || file.isEmpty() || file.getSize() == 0)
@@ -232,6 +228,13 @@ public class UserServiceImpl implements UserService {
 		}
 
 		return readDataFromCsvFile(file);
+	}
+
+	@Override
+	public Resource downloadErrorFileAsResource(String file) {
+
+		String filePath = errorFilePath + file;
+		return FileStorageService.fetchFile(filePath);
 	}
 
 }
