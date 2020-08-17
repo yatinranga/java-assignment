@@ -1,8 +1,12 @@
 package com.digilytics.yatin.java.assignment.entity.user;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.List;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Entity;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.persistence.UniqueConstraint;
@@ -18,8 +22,8 @@ import com.digilytics.yatin.java.assignment.entity.common.BaseEntity;
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "user", uniqueConstraints = { @UniqueConstraint(columnNames = { "username" }) })
-@DynamicInsert
-@DynamicUpdate
+@DynamicInsert(value = true)
+@DynamicUpdate(value = true)
 public class User extends BaseEntity implements Serializable {
 
 	@NotNull(message = "name can't be null")
@@ -34,8 +38,7 @@ public class User extends BaseEntity implements Serializable {
 
 	private Boolean active;
 
-	private String generatedPassword;
-
+	@NotNull(message = "email can't be null")
 	private String email;
 
 	@Size(min = 10, max = 10)
@@ -44,6 +47,28 @@ public class User extends BaseEntity implements Serializable {
 
 	@Transient
 	private Long userId;
+
+	@OneToMany(cascade = CascadeType.ALL, mappedBy = "user")
+	private List<UserRole> userRoles;
+
+	@Transient
+	private Collection<Role> roles;
+
+	public List<UserRole> getUserRoles() {
+		return userRoles;
+	}
+
+	public void setUserRoles(List<UserRole> userRoles) {
+		this.userRoles = userRoles;
+	}
+
+	public Collection<Role> getRoles() {
+		return roles;
+	}
+
+	public void setRoles(Collection<Role> roles) {
+		this.roles = roles;
+	}
 
 	public String getName() {
 		return name;
@@ -75,14 +100,6 @@ public class User extends BaseEntity implements Serializable {
 
 	public void setActive(Boolean active) {
 		this.active = active;
-	}
-
-	public String getGeneratedPassword() {
-		return generatedPassword;
-	}
-
-	public void setGeneratedPassword(String generatedPassword) {
-		this.generatedPassword = generatedPassword;
 	}
 
 	public String getEmail() {

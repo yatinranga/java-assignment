@@ -77,6 +77,14 @@ public class BaseEntity {
 		this.modifiedAt = modifiedAt;
 	}
 
+	public Boolean getActive() {
+		return active;
+	}
+
+	public void setActive(Boolean active) {
+		this.active = active;
+	}
+
 	public User getCreatedBy() {
 		return createdBy;
 	}
@@ -92,13 +100,4 @@ public class BaseEntity {
 	public void setModifiedBy(User modifiedBy) {
 		this.modifiedBy = modifiedBy;
 	}
-
-	public Boolean getActive() {
-		return active;
-	}
-
-	public void setActive(Boolean active) {
-		this.active = active;
-	}
-
 }
