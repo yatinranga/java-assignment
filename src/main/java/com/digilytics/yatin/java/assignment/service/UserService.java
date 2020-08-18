@@ -26,7 +26,7 @@ public interface UserService {
 	DigilyticsUserResponse registerFromFile(MultipartFile file);
 
 	/**
-	 * this method is used for downloading file
+	 * this method is used for downloading error file
 	 * 
 	 * @param file
 	 * @return {@link Resource}

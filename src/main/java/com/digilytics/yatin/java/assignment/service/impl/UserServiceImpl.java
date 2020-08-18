@@ -110,6 +110,7 @@ public class UserServiceImpl implements UserService {
 		user = userJpaDao.save(user);
 		for (Long roleId : request.getRoleIds()) {
 			userRoleJpaDao.save(user.getId(), roleId);
+
 		}
 
 		return fetch(user, request.getRoleIds());
@@ -198,7 +199,6 @@ public class UserServiceImpl implements UserService {
 			for (RoleResponse roleResponse : roleResponseList) {
 				idNameMap.put(roleResponse.getName(), roleResponse.getId());
 			}
-
 			for (String[] row : rows) {
 				UserRequest request = validateUserRequest(row, idNameMap);
 				if (request != null) {
@@ -244,8 +244,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public Resource downloadErrorFileAsResource(String file) {
 
-		String filePath = errorFilePath + file;
-		return FileStorageService.fetchFile(filePath);
+		return FileStorageService.fetchFile(errorFilePath + file);
 	}
 
 }
