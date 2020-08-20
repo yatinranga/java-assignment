@@ -124,7 +124,8 @@ public class UserServiceImpl implements UserService {
 	 * @return
 	 * @throws IOException
 	 */
-	private UserRequest validateUserRequest(String[] row, Map<String, Long> idNameMap) throws IOException {
+	private UserRequest validateUserRequest(String[] row, Map<String, Long> idNameMap, Set<String> storedEmails)
+			throws IOException {
 
 		UserRequest userRequest = new UserRequest();
 		Boolean flag = false;
@@ -146,8 +147,10 @@ public class UserServiceImpl implements UserService {
 		List<String> requestRoles = Arrays.asList(row[2].split("#"));
 		Set<Long> roleIds = new HashSet<Long>();
 
-		Long userId = userJpaDao.findIdByEmailAndActive(userRequest.getEmail(), true);
-		if (userId != null) {
+		// Long userId = userJpaDao.findIdByEmailAndActive(userRequest.getEmail(),
+		// true);
+
+		if (storedEmails.contains(userRequest.getEmail())) {
 			// throw new ValidationException(String.format("This user's email (%s) already
 			// exists", request.getEmail()));
 
@@ -199,10 +202,13 @@ public class UserServiceImpl implements UserService {
 			for (RoleResponse roleResponse : roleResponseList) {
 				idNameMap.put(roleResponse.getName(), roleResponse.getId());
 			}
+
+			Set<String> storedEmails = userJpaDao.findEmailAndActive(true);
 			for (String[] row : rows) {
-				UserRequest request = validateUserRequest(row, idNameMap);
+				UserRequest request = validateUserRequest(row, idNameMap, storedEmails);
 				if (request != null) {
 					UserResponse response = save(request);
+					storedEmails.add(response.getEmail());
 					if (response != null) {
 						logger.info("user successfully saved", response.getId());
 						rowParsed++;
